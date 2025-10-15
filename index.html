@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Strand Reel Length Calculator</title>
+  <meta name="description" content="Mobile-friendly calculator for estimating strand cable length on a reel by geometry or by weight." />
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --card: #151821;
+      --ink: #e8eef2;
+      --muted: #a8b3c0;
+      --accent: #4cc9f0;
+      --accent-2: #80ed99;
+      --warn: #ffd166;
+      --error: #ef476f;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --gap: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--ink);
+      background: radial-gradient(1200px 800px at 50% -10%, #172033 0%, #0b0c10 60%);
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 20px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); margin-bottom: 12px; }
+    h1 { font-size: 1.25rem; margin: 0; letter-spacing: .3px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border: 1px solid rgba(255,255,255,.08); box-shadow: var(--shadow); border-radius: var(--radius); }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: rgba(255,255,255,.04); border-radius: var(--radius); }
+    .tab { border: 1px solid rgba(255,255,255,.12); padding: 10px 12px; text-align: center; border-radius: 12px; cursor: pointer; font-weight: 600; color: var(--muted); background: #12141b; }
+    .tab.active { color: var(--ink); border-color: var(--accent); outline: 2px solid rgba(76,201,240,.35); }
+    .panel { display: none; padding: 16px; }
+    .panel.active { display: block; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+    .field { display: grid; gap: 6px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.09); padding: 10px; border-radius: 12px; }
+    .field label { font-size: .9rem; color: var(--muted); }
+    .field input, .field select { width: 100%; padding: 12px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.15); background: #0f1117; color: var(--ink); font-size: 1.05rem; }
+    .field input:focus, .field select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+
+    .note { color: var(--muted); font-size: .9rem; margin: 6px 0 0; }
+
+    .results { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 720px) { .results { grid-template-columns: 1fr; } }
+    .pill { background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.1); padding: 14px; border-radius: 14px; display: grid; gap: 6px; }
+    .pill .k { color: var(--muted); font-size: .85rem; }
+    .pill .v { font-size: 1.3rem; font-weight: 700; letter-spacing: .3px; }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 14px 0; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,.15); padding: 12px 14px; background: #10131a; color: var(--ink); text-decoration: none; font-weight: 600; cursor: pointer; }
+    .btn:hover { border-color: var(--accent); }
+
+    footer { color: var(--muted); margin-top: 22px; font-size: .9rem; }
+    .small { font-size: .85rem; color: var(--muted); }
+    .ok { color: var(--accent-2); }
+    .warn { color: var(--warn); }
+    .err { color: var(--error); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Strand Reel Length Calculator</h1>
+      <div class="small">Works great on mobile • No tracking • Offline once loaded</div>
+    </header>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="geo">Reel Geometry</button>
+        <button class="tab" data-tab="weight">Weight Method</button>
+      </div>
+
+      <!-- Geometry Panel -->
+      <section class="panel active" id="panel-geo">
+        <div class="toolbar">
+          <div class="field" style="min-width:220px;">
+            <label for="unit">Base unit</label>
+            <select id="unit">
+              <option value="in">in</option>
+              <option value="ft">ft</option>
+              <option value="mm">mm</option>
+              <option value="cm">cm</option>
+              <option value="m">m</option>
+            </select>
+          </div>
+          <button class="btn" id="shareGeo" title="Copy a link with your inputs">Share inputs link</button>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="Do">Outer diameter (Do)</label>
+            <input id="Do" inputmode="decimal" step="any" placeholder="e.g., 80" />
+            <div class="note">Total wound diameter on reel (includes cable)</div>
+          </div>
+          <div class="field">
+            <label for="Di">Core diameter (Di)</label>
+            <input id="Di" inputmode="decimal" step="any" placeholder="e.g., 40" />
+            <div class="note">Drum/core diameter (bare reel)</div>
+          </div>
+          <div class="field">
+            <label for="W">Wound width (W)</label>
+            <input id="W" inputmode="decimal" step="any" placeholder="e.g., 60" />
+            <div class="note">Traverse width of cable pack on reel</div>
+          </div>
+          <div class="field">
+            <label for="d">Cable diameter (d)</label>
+            <input id="d" inputmode="decimal" step="any" placeholder="e.g., 0.5" />
+            <div class="note">Overall strand/cable diameter</div>
+          </div>
+          <div class="field">
+            <label for="p">Packing efficiency (p)</label>
+            <input id="p" inputmode="decimal" step="any" value="0.92" />
+            <div class="note">Use 0.85–0.98; default 0.92 accounts for gaps</div>
+          </div>
+        </div>
+
+        <div class="results" id="geoResults">
+          <div class="pill"><div class="k">Length (base unit)</div><div class="v" id="Lunit">—</div></div>
+          <div class="pill"><div class="k">Length (feet)</div><div class="v" id="Lft">—</div></div>
+          <div class="pill"><div class="k">Length (meters)</div><div class="v" id="Lm">—</div></div>
+        </div>
+
+        <p class="note">Formula: <span class="ok">L ≈ p × W × (Do² − Di²) / d²</span> (all in the same unit). Packing factor adjusts for lay/gaps.</p>
+      </section>
+
+      <!-- Weight Panel -->
+      <section class="panel" id="panel-weight">
+        <div class="toolbar">
+          <div class="field" style="min-width:220px;">
+            <label for="lenUnit">Length unit for WPL</label>
+            <select id="lenUnit">
+              <option value="ft">ft</option>
+              <option value="m">m</option>
+            </select>
+          </div>
+          <button class="btn" id="shareWgt" title="Copy a link with your inputs">Share inputs link</button>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="full">Full reel weight</label>
+            <input id="full" inputmode="decimal" step="any" placeholder="e.g., 520" />
+            <div class="note">Loaded reel (lb or kg)</div>
+          </div>
+          <div class="field">
+            <label for="empty">Empty reel weight</label>
+            <input id="empty" inputmode="decimal" step="any" placeholder="e.g., 120" />
+            <div class="note">Bare reel (lb or kg)</div>
+          </div>
+          <div class="field">
+            <label for="cableOnly">Cable-only weight (optional)</label>
+            <input id="cableOnly" inputmode="decimal" step="any" placeholder="auto = full − empty" />
+            <div class="note">Enter if known; otherwise it’s computed</div>
+          </div>
+          <div class="field">
+            <label for="wpl">Weight per unit length</label>
+            <input id="wpl" inputmode="decimal" step="any" placeholder="e.g., 0.32" />
+            <div class="note">Units match your selection above (lb/ft, kg/m, etc.)</div>
+          </div>
+        </div>
+
+        <div class="results" id="wgtResults">
+          <div class="pill"><div class="k">Cable weight</div><div class="v" id="Wc">—</div></div>
+          <div class="pill"><div class="k">Length (chosen unit)</div><div class="v" id="Lchosen">—</div></div>
+          <div class="pill"><div class="k">Feet / Meters</div><div class="v" id="Lconv">—</div></div>
+        </div>
+
+        <p class="note">If weight-per-length is in <em>ft</em>, we also show meters (1 ft = 0.3048 m) and vice versa.</p>
+      </section>
+    </div>
+
+    <footer>
+      <div>Tip: add this page to your phone’s Home Screen for 1-tap access offline.</div>
+      <div class="small">© 2025 • MIT License • No data leaves your device</div>
+    </footer>
+  </div>
+
+  <script>
+    // Utility: number formatting
+    const fmt = (x) => Number.isFinite(x) ? (Math.abs(x) >= 1000 ? x.toLocaleString(undefined, {maximumFractionDigits: 0}) : x.toLocaleString(undefined, {maximumFractionDigits: 3})) : '—';
+
+    // Tabs
+    const tabs = document.querySelectorAll('.tab');
+    const panels = {
+      geo: document.getElementById('panel-geo'),
+      weight: document.getElementById('panel-weight')
+    };
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      t.classList.add('active');
+      const key = t.dataset.tab;
+      Object.values(panels).forEach(p => p.classList.remove('active'));
+      panels[key].classList.add('active');
+      const url = new URL(location.href);
+      url.searchParams.set('tab', key);
+      history.replaceState(null, '', url);
+    }));
+
+    // Geometry calculator
+    const unit = document.getElementById('unit');
+    const Do = document.getElementById('Do');
+    const Di = document.getElementById('Di');
+    const W  = document.getElementById('W');
+    const d  = document.getElementById('d');
+    const p  = document.getElementById('p');
+    const Lunit = document.getElementById('Lunit');
+    const Lft   = document.getElementById('Lft');
+    const Lm    = document.getElementById('Lm');
+
+    // weight calculator
+    const lenUnit = document.getElementById('lenUnit');
+    const full = document.getElementById('full');
+    const empty = document.getElementById('empty');
+    const cableOnly = document.getElementById('cableOnly');
+    const wpl = document.getElementById('wpl');
+    const Wc = document.getElementById('Wc');
+    const Lchosen = document.getElementById('Lchosen');
+    const Lconv = document.getElementById('Lconv');
+
+    function toFeetPerUnit(u){
+      switch(u){
+        case 'ft': return 1;
+        case 'in': return 1/12;
+        case 'mm': return 1/304.8;
+        case 'cm': return 1/30.48;
+        case 'm':  return 3.280839895; // meters to feet
+        default: return NaN;
+      }
+    }
+    function toMetersPerUnit(u){
+      switch(u){
+        case 'm': return 1;
+        case 'cm': return 0.01;
+        case 'mm': return 0.001;
+        case 'ft': return 0.3048;
+        case 'in': return 0.0254;
+        default: return NaN;
+      }
+    }
+
+    function calcGeo(){
+      const DoV = parseFloat(Do.value);
+      const DiV = parseFloat(Di.value);
+      const WV = parseFloat(W.value);
+      const dV = parseFloat(d.value);
+      const pV = parseFloat(p.value);
+      if([DoV,DiV,WV,dV,pV].some(v => !Number.isFinite(v))){
+        Lunit.textContent = Lft.textContent = Lm.textContent = '—';
+        return;
+      }
+      if(dV <= 0 || DoV <= 0 || DiV < 0 || WV <= 0 || pV <= 0){
+        Lunit.textContent = 'Check inputs';
+        Lft.textContent = Lm.textContent = '—';
+        return;
+      }
+      if(DiV >= DoV){
+        Lunit.textContent = 'Di must be < Do';
+        Lft.textContent = Lm.textContent = '—';
+        return;
+      }
+      const L = pV * WV * ((DoV*DoV - DiV*DiV)/(dV*dV)); // base-unit length
+      const feet = L * toFeetPerUnit(unit.value);
+      const meters = L * toMetersPerUnit(unit.value);
+      Lunit.textContent = fmt(L) + ' ' + unit.value;
+      Lft.textContent = fmt(feet) + ' ft';
+      Lm.textContent = fmt(meters) + ' m';
+    }
+
+    [unit, Do, Di, W, d, p].forEach(el => el.addEventListener('input', calcGeo));
+
+    function calcWeight(){
+      const fullV = parseFloat(full.value);
+      const emptyV = parseFloat(empty.value);
+      const coV = parseFloat(cableOnly.value);
+      const wplV = parseFloat(wpl.value);
+
+      let cableWeight = Number.isFinite(coV) ? coV : (Number.isFinite(fullV) && Number.isFinite(emptyV) ? fullV - emptyV : NaN);
+      if(!Number.isFinite(cableWeight)){
+        Wc.textContent = Lchosen.textContent = Lconv.textContent = '—';
+        return;
+      }
+      Wc.textContent = fmt(cableWeight);
+      if(!Number.isFinite(wplV) || wplV <= 0){
+        Lchosen.textContent = 'Enter weight/length';
+        Lconv.textContent = '—';
+        return;
+      }
+      const L = cableWeight / wplV; // length in chosen unit
+      Lchosen.textContent = fmt(L) + ' ' + lenUnit.value;
+      if(lenUnit.value === 'ft'){
+        Lconv.textContent = fmt(L) + ' ft  |  ' + fmt(L*0.3048) + ' m';
+      } else {
+        Lconv.textContent = fmt(L*3.280839895) + ' ft  |  ' + fmt(L) + ' m';
+      }
+    }
+
+    [lenUnit, full, empty, cableOnly, wpl].forEach(el => el.addEventListener('input', calcWeight));
+
+    // Share input state via URL
+    function share(kind){
+      const url = new URL(location.href);
+      url.searchParams.set('tab', kind);
+      if(kind === 'geo'){
+        url.searchParams.set('unit', unit.value);
+        url.searchParams.set('Do', Do.value);
+        url.searchParams.set('Di', Di.value);
+        url.searchParams.set('W', W.value);
+        url.searchParams.set('d', d.value);
+        url.searchParams.set('p', p.value);
+      } else {
+        url.searchParams.set('lenUnit', lenUnit.value);
+        url.searchParams.set('full', full.value);
+        url.searchParams.set('empty', empty.value);
+        url.searchParams.set('cableOnly', cableOnly.value);
+        url.searchParams.set('wpl', wpl.value);
+      }
+      navigator.clipboard.writeText(url.toString()).then(() => {
+        alert('Link copied to clipboard!');
+      }, () => {
+        prompt('Copy this link:', url.toString());
+      });
+    }
+    document.getElementById('shareGeo').addEventListener('click', () => share('geo'));
+    document.getElementById('shareWgt').addEventListener('click', () => share('weight'));
+
+    // Restore from URL
+    (function initFromUrl(){
+      const url = new URL(location.href);
+      const tab = url.searchParams.get('tab');
+      if(tab && panels[tab]){
+        document.querySelector(`.tab[data-tab="${tab}"]`).click();
+      }
+      const map = new Map([
+        ['unit', unit], ['Do', Do], ['Di', Di], ['W', W], ['d', d], ['p', p],
+        ['lenUnit', lenUnit], ['full', full], ['empty', empty], ['cableOnly', cableOnly], ['wpl', wpl]
+      ]);
+      map.forEach((el, key) => {
+        const v = url.searchParams.get(key);
+        if(v !== null) el.value = v;
+      });
+      calcGeo();
+      calcWeight();
+    })();
+
+    // Initial calc for empty state
+    calcGeo();
+    calcWeight();
+  </script>
+</body>
+</html>
